@@ -18,8 +18,8 @@ type TestEvent struct {
 	event_time time.Time
 }
 
-func NewTestEvent() *TestEvent {
-	return &TestEvent{event_time: time.Now()}
+func NewTestEvent(t time.Time) *TestEvent {
+	return &TestEvent{event_time: t}
 }
 
 func (t *TestEvent) Execute(ctx context.Context) {

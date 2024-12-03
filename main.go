@@ -20,9 +20,11 @@ func main() {
 	}
 
 	// Add events
+	start_time := time.Now()
 	for i := 0; i < 5; i++ {
-		simulator.AddEventToLoad(simulator.NewTestEvent())
-		time.Sleep(3 * time.Second)
+		simulator.AddEventToLoad(simulator.NewTestEvent(start_time))
+		d, _ := time.ParseDuration(fmt.Sprintf("%ds", 3))
+		start_time = start_time.Add(d)
 	}
 
 	simulator.LoadEventsIntoQueue()
