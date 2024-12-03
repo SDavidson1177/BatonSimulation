@@ -16,9 +16,8 @@ const (
 
 // Global simulator state
 type State struct {
-	Seq        uint64
-	Chains     map[string]*Chain
-	Neighbours map[string][]*Chain
+	Seq    uint64
+	Chains map[string]*Chain
 
 	// Add periodic events for implicit event loading
 	implicit_intervals []uint32 // interval between implicit events in milliseconds
@@ -27,7 +26,7 @@ type State struct {
 }
 
 func NewState() *State {
-	s := &State{Seq: 0, Chains: make(map[string]*Chain), Neighbours: make(map[string][]*Chain)}
+	s := &State{Seq: 0, Chains: make(map[string]*Chain)}
 
 	// Add info for implicit events
 	s.implicit_intervals = make([]uint32, 1)

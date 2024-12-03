@@ -12,7 +12,7 @@ type Chain struct {
 }
 
 func NewChain(id string) *Chain {
-	return &Chain{id: id}
+	return &Chain{id: id, view: make(map[string]uint64), neighbours: make(map[string]*Chain)}
 }
 
 func (c *Chain) GetID() string {
@@ -43,4 +43,8 @@ func (c *Chain) GetHeight() uint64 {
 func (c *Chain) IncHeight() uint64 {
 	c.height++
 	return c.height
+}
+
+func (c *Chain) AddNeighbour(ch *Chain) {
+	c.neighbours[ch.GetID()] = ch
 }
