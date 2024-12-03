@@ -195,6 +195,12 @@ func (e *SendEvent) Execute(ctx context.Context) {
 		}
 	}
 
+	// Add the deliver event
+	update_events[len(update_events)-1].SetFollowing([]Event{NewDeliverEvent(
+		update_events[len(update_events)-1].Time(),
+		e.hops[len(e.hops)-1],
+	)})
+
 	// Only enqueue the first update event. The rest will be triggered as needed
 	MainEventQueue.Enqueue(update_events[0])
 }
@@ -220,5 +226,51 @@ func (e *SendEvent) SetFollowing(events []Event) {
 }
 
 func (e *SendEvent) AdjustTime(t time.Time) {
+	e.event_time = t
+}
+
+// Deliver event
+type DeliverEvent struct {
+	event_time time.Time
+	following  []Event
+	chain      string
+}
+
+func NewDeliverEvent(t time.Time, chain_id string) *DeliverEvent {
+	return &DeliverEvent{event_time: t, following: make([]Event, 0), chain: chain_id}
+}
+
+func (e *DeliverEvent) Execute(ctx context.Context) {
+	state, err := GetStateFromContext(ctx)
+	if err != nil {
+		return
+	}
+
+	if chain, ok := state.Chains[e.chain]; ok {
+		fmt.Printf("Delivering messages to chain %s at time %v\n", chain.GetID(), e.Time())
+	}
+}
+
+func (e *DeliverEvent) Time() time.Time {
+	return e.event_time
+}
+
+func (e *DeliverEvent) AddMsg() {
+	fmt.Printf("Adding deliver event with time: %v\n", e.Time())
+}
+
+func (t *DeliverEvent) SubEvents() []Event {
+	return nil
+}
+
+func (e *DeliverEvent) Following() []Event {
+	return e.following
+}
+
+func (e *DeliverEvent) SetFollowing(events []Event) {
+	e.following = events
+}
+
+func (e *DeliverEvent) AdjustTime(t time.Time) {
 	e.event_time = t
 }
