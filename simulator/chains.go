@@ -47,4 +47,18 @@ func (c *Chain) IncHeight() uint64 {
 
 func (c *Chain) AddNeighbour(ch *Chain) {
 	c.neighbours[ch.GetID()] = ch
+	c.view[ch.GetID()] = ch.GetHeight()
+}
+
+func (c *Chain) GetNeighbour(id string) (*Chain, bool) {
+	n, ok := c.neighbours[id]
+	if !ok {
+		return nil, ok
+	}
+
+	return n, true
+}
+
+func (c *Chain) GetNeighbours() map[string]*Chain {
+	return c.neighbours
 }

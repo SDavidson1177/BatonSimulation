@@ -20,7 +20,7 @@ func readTopology(filename string) (map[string]*simulator.Chain, error) {
 	scanner := bufio.NewScanner(file)
 
 	GetChainID := func(id string) string {
-		return fmt.Sprintf("baton-%s\n", id)
+		return fmt.Sprintf("baton-%s", id)
 	}
 
 	chains := make(map[string]*simulator.Chain)
@@ -75,7 +75,12 @@ func main() {
 	// Add events
 	start_time := time.Now()
 	for i := 0; i < 5; i++ {
-		simulator.AddEventToLoad(simulator.NewTestEvent(start_time))
+		for _, ch := range chains {
+			for n := range ch.GetNeighbours() {
+				simulator.AddEventToLoad(simulator.NewUpdateEvent(start_time, ch.GetID(), n))
+			}
+		}
+
 		d, _ := time.ParseDuration(fmt.Sprintf("%ds", 3))
 		start_time = start_time.Add(d)
 	}

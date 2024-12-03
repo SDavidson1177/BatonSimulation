@@ -46,7 +46,24 @@ func NewUpdateEvent(t time.Time, chain_id string, neighbour_id string) *UpdateEv
 }
 
 func (e *UpdateEvent) Execute(ctx context.Context) {
+	state, err := GetStateFromContext(ctx)
+	if err != nil {
+		return
+	}
 
+	ch, ok := state.Chains[e.chain]
+	if !ok {
+		fmt.Printf("failed to update. Could not find chain %s\n", e.chain)
+		return
+	}
+
+	if err := ch.UpdateView(e.neighbour); err != nil {
+		fmt.Printf("could not update view. %s\n", err.Error())
+	}
+
+	// Since update happened, neighbour should exist
+	n, _ := ch.GetNeighbour(e.neighbour)
+	fmt.Printf("Updated chain %s to view chain %s at height %d\n", e.chain, e.neighbour, n.GetHeight())
 }
 
 func (e *UpdateEvent) Time() time.Time {
