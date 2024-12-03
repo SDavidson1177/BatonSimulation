@@ -3,6 +3,7 @@ package simulator
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 var MainEventQueue EventQueue
@@ -92,6 +93,14 @@ func (eh *EventHeap) Insert(event Event) {
 	eh.bubbleUp(len(eh.heap) - 1)
 }
 
+func (eh *EventHeap) Top() Event {
+	if len(eh.heap) == 0 {
+		return nil
+	}
+
+	return eh.heap[0]
+}
+
 func (eh *EventHeap) Pop() Event {
 	if len(eh.heap) == 0 {
 		return nil
@@ -143,13 +152,45 @@ func AddEventToLoad(event Event) {
 // also add any necessary implicit event. For example, this
 // will add events to increment the height of each blockchain.
 func LoadEventsIntoQueue() error {
+	var implicit_timer time.Time
+	started := false
+
 	for {
 		event := EventLoader.Pop()
 		if event == nil {
+			// Check in case empty
 			break
 		}
 
+		if !started {
+			// initialize implicit timer to start at the same time as the first event
+			implicit_timer = event.Time()
+			started = true
+		}
+
 		MainEventQueue.Enqueue(event)
+
+		// Get the next event
+		next := EventLoader.Top()
+		if next == nil {
+			// no more events
+			break
+		}
+
+		// Add implicit events
+		i_time, i_type, err := MainEventQueue.BatonState.GetNextImplicit(implicit_timer, next.Time())
+		for err == nil {
+			switch i_type {
+			case IMPLICIT_HEIGHT:
+				// Create update height event for every blockchain
+				for _, ch := range MainEventQueue.BatonState.Chains {
+					MainEventQueue.Enqueue(NewHeightEvent(i_time, ch.GetID()))
+				}
+			}
+
+			implicit_timer = i_time
+			i_time, i_type, err = MainEventQueue.BatonState.GetNextImplicit(implicit_timer, next.Time())
+		}
 	}
 
 	return nil

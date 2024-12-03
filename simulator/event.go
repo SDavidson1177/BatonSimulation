@@ -56,3 +56,32 @@ func (e *UpdateEvent) Time() time.Time {
 func (e *UpdateEvent) AddMsg() {
 	fmt.Printf("Adding update event with time: %v\n", e.Time())
 }
+
+// Height event
+type HeightEvent struct {
+	event_time time.Time
+	chain      string
+}
+
+func NewHeightEvent(t time.Time, chain_id string) *HeightEvent {
+	return &HeightEvent{event_time: t, chain: chain_id}
+}
+
+func (e *HeightEvent) Execute(ctx context.Context) {
+	state, err := GetStateFromContext(ctx)
+	if err != nil {
+		return
+	}
+
+	if chain, ok := state.Chains[e.chain]; ok {
+		fmt.Printf("Height of chain %s increased to %d at time %v\n", chain.GetID(), chain.IncHeight(), e.Time())
+	}
+}
+
+func (e *HeightEvent) Time() time.Time {
+	return e.event_time
+}
+
+func (e *HeightEvent) AddMsg() {
+	fmt.Printf("Adding height event with time: %v\n", e.Time())
+}

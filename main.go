@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/SDavidson1177/ThroughputSim/simulator"
@@ -13,9 +14,15 @@ func main() {
 	main_event := simulator.InitQueue()
 	ctx = context.WithValue(ctx, simulator.GetContextKey(simulator.StateContextKey), main_event.BatonState)
 
-	for i := 0; i < 4; i++ {
+	// Add blockchains
+	for i := 0; i < 5; i++ {
+		main_event.BatonState.AddChain(simulator.NewChain(fmt.Sprintf("baton-%d", i)))
+	}
+
+	// Add events
+	for i := 0; i < 5; i++ {
 		simulator.AddEventToLoad(simulator.NewTestEvent())
-		time.Sleep(time.Second)
+		time.Sleep(3 * time.Second)
 	}
 
 	simulator.LoadEventsIntoQueue()

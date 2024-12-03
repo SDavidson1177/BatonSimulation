@@ -39,3 +39,8 @@ func (c *Chain) UpdateView(chain_id string) error {
 func (c *Chain) GetHeight() uint64 {
 	return c.height
 }
+
+func (c *Chain) IncHeight() uint64 {
+	c.height++
+	return c.height
+}
