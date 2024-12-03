@@ -1,6 +1,12 @@
 package simulator
 
-var MainEvent EventQueue
+import (
+	"context"
+	"errors"
+)
+
+var MainEventQueue EventQueue
+var EventLoader EventHeap
 
 // Event Heap
 type EventHeap struct {
@@ -102,21 +108,49 @@ func (eh *EventHeap) Pop() Event {
 // Event Queue
 type EventQueue struct {
 	queue *EventHeap
+
+	BatonState *State
 }
 
 func InitQueue() *EventQueue {
-	MainEvent = EventQueue{queue: &EventHeap{}}
-	return &MainEvent
+	MainEventQueue = EventQueue{queue: &EventHeap{}, BatonState: NewState()}
+	EventLoader = EventHeap{}
+	return &MainEventQueue
 }
 
 func (e *EventQueue) Enqueue(event Event) {
 	e.queue.Insert(event)
 }
 
-func (e *EventQueue) Step() {
+func (e *EventQueue) Step(ctx context.Context) error {
 	event := e.queue.Pop()
 	if event == nil {
-		return
+		return errors.New("empty")
 	}
-	event.Execute()
+	event.Execute(ctx)
+
+	return nil
+}
+
+// Add & Load events
+func AddEventToLoad(event Event) {
+	EventLoader.Insert(event)
+	event.AddMsg()
+}
+
+// LoadEventsIntoQueue will load all the events added to the
+// event loader into the event queue. This function will
+// also add any necessary implicit event. For example, this
+// will add events to increment the height of each blockchain.
+func LoadEventsIntoQueue() error {
+	for {
+		event := EventLoader.Pop()
+		if event == nil {
+			break
+		}
+
+		MainEventQueue.Enqueue(event)
+	}
+
+	return nil
 }
