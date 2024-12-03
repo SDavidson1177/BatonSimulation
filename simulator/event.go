@@ -10,12 +10,17 @@ type Event interface {
 	Execute(ctx context.Context)
 	Time() time.Time
 	AddMsg()
+	SubEvents() []Event
+	Following() []Event
+	SetFollowing([]Event)
+	AdjustTime(time.Time)
 }
 
 // Test event
 
 type TestEvent struct {
 	event_time time.Time
+	following  []Event
 }
 
 func NewTestEvent(t time.Time) *TestEvent {
@@ -34,15 +39,32 @@ func (t *TestEvent) AddMsg() {
 	fmt.Printf("Adding test event with time: %v\n", t.Time())
 }
 
+func (t *TestEvent) SubEvents() []Event {
+	return nil
+}
+
+func (t *TestEvent) SetFollowing(events []Event) {
+	t.following = events
+}
+
+func (t *TestEvent) Following() []Event {
+	return t.following
+}
+
+func (t *TestEvent) AdjustTime(et time.Time) {
+	t.event_time = et
+}
+
 // Update event
 type UpdateEvent struct {
 	event_time time.Time
+	following  []Event
 	chain      string
 	neighbour  string
 }
 
 func NewUpdateEvent(t time.Time, chain_id string, neighbour_id string) *UpdateEvent {
-	return &UpdateEvent{event_time: t, chain: chain_id, neighbour: neighbour_id}
+	return &UpdateEvent{event_time: t, following: make([]Event, 0), chain: chain_id, neighbour: neighbour_id}
 }
 
 func (e *UpdateEvent) Execute(ctx context.Context) {
@@ -63,7 +85,12 @@ func (e *UpdateEvent) Execute(ctx context.Context) {
 
 	// Since update happened, neighbour should exist
 	n, _ := ch.GetNeighbour(e.neighbour)
-	fmt.Printf("Updated chain %s to view chain %s at height %d\n", e.chain, e.neighbour, n.GetHeight())
+	fmt.Printf("Updated chain %s to view chain %s at height %d: %v\n", e.chain, e.neighbour, n.GetHeight(), e.Time())
+
+	// Enqueue next update if there is one to follow
+	for _, update_follow := range e.Following() {
+		MainEventQueue.Enqueue(update_follow)
+	}
 }
 
 func (e *UpdateEvent) Time() time.Time {
@@ -74,14 +101,31 @@ func (e *UpdateEvent) AddMsg() {
 	fmt.Printf("Adding update event with time: %v\n", e.Time())
 }
 
+func (e *UpdateEvent) SubEvents() []Event {
+	return nil
+}
+
+func (e *UpdateEvent) Following() []Event {
+	return e.following
+}
+
+func (e *UpdateEvent) SetFollowing(events []Event) {
+	e.following = events
+}
+
+func (e *UpdateEvent) AdjustTime(t time.Time) {
+	e.event_time = t
+}
+
 // Height event
 type HeightEvent struct {
 	event_time time.Time
+	following  []Event
 	chain      string
 }
 
 func NewHeightEvent(t time.Time, chain_id string) *HeightEvent {
-	return &HeightEvent{event_time: t, chain: chain_id}
+	return &HeightEvent{event_time: t, following: make([]Event, 0), chain: chain_id}
 }
 
 func (e *HeightEvent) Execute(ctx context.Context) {
@@ -101,4 +145,80 @@ func (e *HeightEvent) Time() time.Time {
 
 func (e *HeightEvent) AddMsg() {
 	fmt.Printf("Adding height event with time: %v\n", e.Time())
+}
+
+func (t *HeightEvent) SubEvents() []Event {
+	return nil
+}
+
+func (e *HeightEvent) Following() []Event {
+	return e.following
+}
+
+func (e *HeightEvent) SetFollowing(events []Event) {
+	e.following = events
+}
+
+func (e *HeightEvent) AdjustTime(t time.Time) {
+	e.event_time = t
+}
+
+// Send event
+type SendEvent struct {
+	event_time time.Time
+	following  []Event
+	src_chain  string
+	hops       []string // chain hops not including the source chain
+}
+
+func NewSendEvent(t time.Time, src_chain string, hops []string) *SendEvent {
+	return &SendEvent{event_time: t, following: make([]Event, 0), src_chain: src_chain, hops: hops}
+}
+
+func (e *SendEvent) Execute(ctx context.Context) {
+	// Create update events
+	if len(e.hops) < 1 {
+		return
+	}
+
+	update_events := make([]Event, len(e.hops))
+	a := e.src_chain
+	for i := range e.hops {
+		b := e.hops[i]
+		d, _ := time.ParseDuration(fmt.Sprintf("%dms", i*IMPLICIT_HEIGHT_INTERVAL))
+		update_events[i] = NewUpdateEvent(e.Time().Add(d), a, b)
+		a = b
+
+		// Add the following update event
+		if i > 0 {
+			update_events[i-1].SetFollowing([]Event{update_events[i]})
+		}
+	}
+
+	// Only enqueue the first update event. The rest will be triggered as needed
+	MainEventQueue.Enqueue(update_events[0])
+}
+
+func (e *SendEvent) Time() time.Time {
+	return e.event_time
+}
+
+func (e *SendEvent) AddMsg() {
+	fmt.Printf("Adding send event with time: %v\n", e.Time())
+}
+
+func (t *SendEvent) SubEvents() []Event {
+	return nil
+}
+
+func (e *SendEvent) Following() []Event {
+	return e.following
+}
+
+func (e *SendEvent) SetFollowing(events []Event) {
+	e.following = events
+}
+
+func (e *SendEvent) AdjustTime(t time.Time) {
+	e.event_time = t
 }

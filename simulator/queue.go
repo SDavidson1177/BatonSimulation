@@ -136,6 +136,8 @@ func (e *EventQueue) Step(ctx context.Context) error {
 	if event == nil {
 		return errors.New("empty")
 	}
+
+	e.BatonState.Time = event.Time()
 	event.Execute(ctx)
 
 	return nil
@@ -145,6 +147,12 @@ func (e *EventQueue) Step(ctx context.Context) error {
 func AddEventToLoad(event Event) {
 	EventLoader.Insert(event)
 	event.AddMsg()
+
+	// Load sub events
+	sub_events := event.SubEvents()
+	for _, e := range sub_events {
+		AddEventToLoad(e)
+	}
 }
 
 // LoadEventsIntoQueue will load all the events added to the

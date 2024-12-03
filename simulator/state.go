@@ -18,6 +18,7 @@ const (
 type State struct {
 	Seq    uint64
 	Chains map[string]*Chain
+	Time   time.Time
 
 	// Add periodic events for implicit event loading
 	implicit_intervals []uint32 // interval between implicit events in milliseconds
