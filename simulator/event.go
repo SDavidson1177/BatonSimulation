@@ -3,11 +3,21 @@ package simulator
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
+)
+
+const (
+	TEST_EVENT_TYPE    = 0
+	UPDATE_EVENT_TYPE  = 1
+	HEIGHT_EVENT_TYPE  = 2
+	SEND_EVENT_TYPE    = 3
+	DELIVER_EVENT_TYPE = 4
 )
 
 type Event interface {
 	Execute(ctx context.Context)
+	Type() uint64
 	Time() time.Time
 	AddMsg()
 	SubEvents() []Event
@@ -29,6 +39,10 @@ func NewTestEvent(t time.Time) *TestEvent {
 
 func (t *TestEvent) Execute(ctx context.Context) {
 	fmt.Printf("test: %v\n", t.Time())
+}
+
+func (t *TestEvent) Type() uint64 {
+	return TEST_EVENT_TYPE
 }
 
 func (t *TestEvent) Time() time.Time {
@@ -79,7 +93,8 @@ func (e *UpdateEvent) Execute(ctx context.Context) {
 		return
 	}
 
-	if err := ch.UpdateView(e.neighbour); err != nil {
+	var updated bool
+	if updated, err = ch.UpdateView(e.neighbour); err != nil {
 		fmt.Printf("could not update view. %s\n", err.Error())
 	}
 
@@ -88,9 +103,22 @@ func (e *UpdateEvent) Execute(ctx context.Context) {
 	fmt.Printf("Updated chain %s to view chain %s at height %d: %v\n", e.chain, e.neighbour, n.GetHeight(), e.Time())
 
 	// Enqueue next update if there is one to follow
-	for _, update_follow := range e.Following() {
-		MainEventQueue.Enqueue(update_follow)
+	for _, follow := range e.Following() {
+		// Enqueue event immediately if it is deliver, as the send
+		// event should have scheduled the deliver event for the same
+		// time as this update event. Otherwise, we may want to schdule
+		// the next update event to run immediately after if this event
+		// did not trigger an update.
+		if (follow.Type() == UPDATE_EVENT_TYPE && !updated) || follow.Type() == DELIVER_EVENT_TYPE {
+			// adjust time of next update event so that it is triggered immediately
+			follow.AdjustTime(e.Time())
+		}
+		MainEventQueue.Enqueue(follow)
 	}
+}
+
+func (e *UpdateEvent) Type() uint64 {
+	return UPDATE_EVENT_TYPE
 }
 
 func (e *UpdateEvent) Time() time.Time {
@@ -139,6 +167,10 @@ func (e *HeightEvent) Execute(ctx context.Context) {
 	}
 }
 
+func (e *HeightEvent) Type() uint64 {
+	return HEIGHT_EVENT_TYPE
+}
+
 func (e *HeightEvent) Time() time.Time {
 	return e.event_time
 }
@@ -185,7 +217,7 @@ func (e *SendEvent) Execute(ctx context.Context) {
 	a := e.src_chain
 	for i := range e.hops {
 		b := e.hops[i]
-		d, _ := time.ParseDuration(fmt.Sprintf("%dms", i*IMPLICIT_HEIGHT_INTERVAL))
+		d, _ := time.ParseDuration(fmt.Sprintf("%dms", int(math.Round(float64(i)*1.233*IMPLICIT_HEIGHT_INTERVAL))))
 		update_events[i] = NewUpdateEvent(e.Time().Add(d), a, b)
 		a = b
 
@@ -203,6 +235,10 @@ func (e *SendEvent) Execute(ctx context.Context) {
 
 	// Only enqueue the first update event. The rest will be triggered as needed
 	MainEventQueue.Enqueue(update_events[0])
+}
+
+func (e *SendEvent) Type() uint64 {
+	return SEND_EVENT_TYPE
 }
 
 func (e *SendEvent) Time() time.Time {
@@ -249,6 +285,10 @@ func (e *DeliverEvent) Execute(ctx context.Context) {
 	if chain, ok := state.Chains[e.chain]; ok {
 		fmt.Printf("Delivering messages to chain %s at time %v\n", chain.GetID(), e.Time())
 	}
+}
+
+func (e *DeliverEvent) Type() uint64 {
+	return DELIVER_EVENT_TYPE
 }
 
 func (e *DeliverEvent) Time() time.Time {

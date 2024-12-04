@@ -52,7 +52,7 @@ func readTopology(filename string) (map[string]*simulator.Chain, error) {
 func main() {
 	args := os.Args
 	if len(args) < 2 {
-		fmt.Print("missing edges csv file")
+		fmt.Println("missing edges csv file")
 		return
 	}
 
@@ -84,8 +84,15 @@ func main() {
 	// 	d, _ := time.ParseDuration(fmt.Sprintf("%ds", 3))
 	// 	start_time = start_time.Add(d)
 	// }
+	d, _ := time.ParseDuration("5s")
 	simulator.AddEventToLoad(simulator.NewSendEvent(
 		start_time,
+		"baton-1",
+		[]string{"baton-2", "baton-3"},
+	))
+
+	simulator.AddEventToLoad(simulator.NewSendEvent(
+		start_time.Add(d),
 		"baton-1",
 		[]string{"baton-2", "baton-3"},
 	))

@@ -52,6 +52,9 @@ func (eh *EventHeap) bubbleUp(i int) {
 		tmp := eh.heap[i]
 		eh.heap[i] = eh.heap[parent]
 		eh.heap[parent] = tmp
+
+		i = parent
+		parent = eh.parent(i)
 	}
 }
 
@@ -80,7 +83,7 @@ func (eh *EventHeap) bubbleDown(i int) {
 			break
 		}
 
-		tmp := min_event
+		tmp := eh.heap[min_index]
 		eh.heap[min_index] = eh.heap[i]
 		eh.heap[i] = tmp
 		i = min_index
@@ -105,6 +108,12 @@ func (eh *EventHeap) Pop() Event {
 	if len(eh.heap) == 0 {
 		return nil
 	}
+
+	// fmt.Printf("HEAP POP: ")
+	// for _, e := range eh.heap {
+	// 	fmt.Printf("%v ", e.Time())
+	// }
+	// fmt.Printf("\n\n")
 
 	top := eh.heap[0]
 	eh.heap[0] = eh.heap[len(eh.heap)-1]

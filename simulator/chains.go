@@ -27,13 +27,18 @@ func (c *Chain) GetView(chain_id string) uint64 {
 	return 0
 }
 
-func (c *Chain) UpdateView(chain_id string) error {
+// UpdateView returns true when a client update was necessary
+// to track the neighbour's new height. Otherwise, return false.
+func (c *Chain) UpdateView(chain_id string) (bool, error) {
 	if _, ok := c.view[chain_id]; !ok {
-		return fmt.Errorf("cannot find chain %s for view update", chain_id)
+		return false, fmt.Errorf("cannot find chain %s for view update", chain_id)
 	}
 
+	if c.view[chain_id] == c.neighbours[chain_id].GetHeight() {
+		return false, nil
+	}
 	c.view[chain_id] = c.neighbours[chain_id].GetHeight()
-	return nil
+	return true, nil
 }
 
 func (c *Chain) GetHeight() uint64 {
