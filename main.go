@@ -74,30 +74,29 @@ func main() {
 
 	// Add events
 	start_time := time.Now()
-	// for i := 0; i < 5; i++ {
-	// 	for _, ch := range chains {
-	// 		for n := range ch.GetNeighbours() {
-	// 			simulator.AddEventToLoad(simulator.NewUpdateEvent(start_time, ch.GetID(), n))
-	// 		}
-	// 	}
-
-	// 	d, _ := time.ParseDuration(fmt.Sprintf("%ds", 3))
-	// 	start_time = start_time.Add(d)
-	// }
 	d, _ := time.ParseDuration("5s")
+
+	// Test shortest paths
+	sp, err := simulator.GetShortestPath(ctx, "baton-1", "baton-3")
+	if err != nil {
+		return
+	}
+
 	simulator.AddEventToLoad(simulator.NewSendEvent(
 		start_time,
-		"baton-1",
-		[]string{"baton-2", "baton-3"},
+		sp[0],
+		sp[1:],
 	))
 
 	simulator.AddEventToLoad(simulator.NewSendEvent(
 		start_time.Add(d),
-		"baton-1",
-		[]string{"baton-2", "baton-3"},
+		sp[0],
+		sp[1:],
 	))
 
 	simulator.LoadEventsIntoQueue()
+
+	fmt.Printf("SP: %v\n", sp)
 
 	for main_event.Step(ctx) == nil {
 	}

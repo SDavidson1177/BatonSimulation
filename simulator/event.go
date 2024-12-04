@@ -314,3 +314,43 @@ func (e *DeliverEvent) SetFollowing(events []Event) {
 func (e *DeliverEvent) AdjustTime(t time.Time) {
 	e.event_time = t
 }
+
+// Dijkstra event. Not to be loaded into main event queue. Just so that we can use event heap.
+type DijkstraEvent struct {
+	Distance int
+	Chain    string
+}
+
+func NewDijkstraEvent(distance int, chain_id string) *DijkstraEvent {
+	return &DijkstraEvent{Distance: distance, Chain: chain_id}
+}
+
+func (e *DijkstraEvent) Execute(ctx context.Context) {
+}
+
+func (e *DijkstraEvent) Type() uint64 {
+	return DELIVER_EVENT_TYPE
+}
+
+func (e *DijkstraEvent) Time() time.Time {
+	return time.Unix(int64(e.Distance), 0)
+}
+
+func (e *DijkstraEvent) AddMsg() {
+	fmt.Printf("Adding dijkstra event with distance and chain: %d, %s\n", e.Distance, e.Chain)
+}
+
+func (t *DijkstraEvent) SubEvents() []Event {
+	return nil
+}
+
+func (e *DijkstraEvent) Following() []Event {
+	return nil
+}
+
+func (e *DijkstraEvent) SetFollowing(events []Event) {
+}
+
+func (e *DijkstraEvent) AdjustTime(t time.Time) {
+	e.Distance = int(t.Unix())
+}

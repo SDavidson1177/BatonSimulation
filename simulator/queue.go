@@ -123,6 +123,25 @@ func (eh *EventHeap) Pop() Event {
 	return top
 }
 
+func (eh *EventHeap) Find(this_event Event, cmp func(Event, Event) bool) (Event, int) {
+	for i := range eh.heap {
+		if cmp(this_event, eh.heap[i]) {
+			return eh.heap[i], i
+		}
+	}
+	return nil, -1
+}
+
+func (eh *EventHeap) Update(index int) {
+	// Check whether to bubble up or down
+	parent := eh.parent(index)
+	if parent < 0 || eh.heap[parent].Time().Before(eh.heap[index].Time()) {
+		eh.bubbleDown(index)
+		return
+	}
+	eh.bubbleUp(index)
+}
+
 // Event Queue
 type EventQueue struct {
 	queue *EventHeap
