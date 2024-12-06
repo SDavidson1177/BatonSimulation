@@ -18,6 +18,7 @@ const (
 type Event interface {
 	Execute(ctx context.Context)
 	Type() uint64
+	Copy() Event
 	Time() time.Time
 	AddMsg()
 	SubEvents() []Event
@@ -43,6 +44,10 @@ func (t *TestEvent) Execute(ctx context.Context) {
 
 func (t *TestEvent) Type() uint64 {
 	return TEST_EVENT_TYPE
+}
+
+func (t *TestEvent) Copy() Event {
+	return NewTestEvent(t.Time())
 }
 
 func (t *TestEvent) Time() time.Time {
@@ -121,6 +126,10 @@ func (e *UpdateEvent) Type() uint64 {
 	return UPDATE_EVENT_TYPE
 }
 
+func (e *UpdateEvent) Copy() Event {
+	return NewUpdateEvent(e.Time(), e.chain, e.neighbour)
+}
+
 func (e *UpdateEvent) Time() time.Time {
 	return e.event_time
 }
@@ -169,6 +178,10 @@ func (e *HeightEvent) Execute(ctx context.Context) {
 
 func (e *HeightEvent) Type() uint64 {
 	return HEIGHT_EVENT_TYPE
+}
+
+func (e *HeightEvent) Copy() Event {
+	return NewHeightEvent(e.Time(), e.chain)
 }
 
 func (e *HeightEvent) Time() time.Time {
@@ -241,6 +254,10 @@ func (e *SendEvent) Type() uint64 {
 	return SEND_EVENT_TYPE
 }
 
+func (e *SendEvent) Copy() Event {
+	return NewSendEvent(e.Time(), e.src_chain, e.hops)
+}
+
 func (e *SendEvent) Time() time.Time {
 	return e.event_time
 }
@@ -291,6 +308,10 @@ func (e *DeliverEvent) Type() uint64 {
 	return DELIVER_EVENT_TYPE
 }
 
+func (e *DeliverEvent) Copy() Event {
+	return NewDeliverEvent(e.Time(), e.chain)
+}
+
 func (e *DeliverEvent) Time() time.Time {
 	return e.event_time
 }
@@ -330,6 +351,10 @@ func (e *DijkstraEvent) Execute(ctx context.Context) {
 
 func (e *DijkstraEvent) Type() uint64 {
 	return DELIVER_EVENT_TYPE
+}
+
+func (e *DijkstraEvent) Copy() Event {
+	return NewDijkstraEvent(e.Distance, e.Chain)
 }
 
 func (e *DijkstraEvent) Time() time.Time {

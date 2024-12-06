@@ -149,10 +149,15 @@ type EventQueue struct {
 	BatonState *State
 }
 
-func InitQueue() *EventQueue {
+func NewQueue() *EventQueue {
 	MainEventQueue = EventQueue{queue: &EventHeap{}, BatonState: NewState()}
 	EventLoader = EventHeap{}
 	return &MainEventQueue
+}
+
+// Should be called after adding all chains
+func (e *EventQueue) Init() {
+	e.BatonState.InitializeImplicitEvents()
 }
 
 func (e *EventQueue) Enqueue(event Event) {
@@ -214,18 +219,12 @@ func LoadEventsIntoQueue() error {
 		}
 
 		// Add implicit events
-		i_time, i_type, err := MainEventQueue.BatonState.GetNextImplicit(implicit_timer, next.Time())
+		evnt, err := MainEventQueue.BatonState.GetNextImplicit(implicit_timer, next.Time())
 		for err == nil {
-			switch i_type {
-			case IMPLICIT_HEIGHT:
-				// Create update height event for every blockchain
-				for _, ch := range MainEventQueue.BatonState.Chains {
-					MainEventQueue.Enqueue(NewHeightEvent(i_time, ch.GetID()))
-				}
-			}
-
-			implicit_timer = i_time
-			i_time, i_type, err = MainEventQueue.BatonState.GetNextImplicit(implicit_timer, next.Time())
+			MainEventQueue.Enqueue(evnt)
+			implicit_timer = evnt.Time()
+			next = EventLoader.Top()
+			evnt, err = MainEventQueue.BatonState.GetNextImplicit(implicit_timer, next.Time())
 		}
 	}
 

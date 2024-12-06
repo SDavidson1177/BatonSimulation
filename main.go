@@ -64,13 +64,14 @@ func main() {
 
 	ctx := context.Background()
 
-	main_event := simulator.InitQueue()
+	main_event := simulator.NewQueue()
 	ctx = context.WithValue(ctx, simulator.GetContextKey(simulator.StateContextKey), main_event.BatonState)
 
 	// Add blockchains
 	for _, chain := range chains {
 		main_event.BatonState.AddChain(chain)
 	}
+	main_event.Init()
 
 	// Add events
 	start_time := time.Now()
