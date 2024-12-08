@@ -9,6 +9,10 @@ type Chain struct {
 	// This chain's view of its neighbour
 	view       map[string]uint64
 	neighbours map[string]*Chain
+
+	// Keep track of congestion
+	maxTxCount int
+	txCount    int
 }
 
 func NewChain(id string) *Chain {
@@ -27,6 +31,21 @@ func (c *Chain) GetView(chain_id string) uint64 {
 	return 0
 }
 
+func (c *Chain) IncreaseTxCount() {
+	c.txCount++
+}
+
+func (c *Chain) ResetTxCount() {
+	if c.txCount > c.maxTxCount {
+		c.maxTxCount = c.txCount
+	}
+	c.txCount = 0
+}
+
+func (c *Chain) GetMaxTxCount() int {
+	return c.maxTxCount
+}
+
 // UpdateView returns true when a client update was necessary
 // to track the neighbour's new height. Otherwise, return false.
 func (c *Chain) UpdateView(chain_id string) (bool, error) {
@@ -38,6 +57,10 @@ func (c *Chain) UpdateView(chain_id string) (bool, error) {
 		return false, nil
 	}
 	c.neighbours[chain_id].view[c.GetID()] = c.GetHeight()
+
+	// Update the amount of transactions received at this block height
+	c.neighbours[chain_id].IncreaseTxCount()
+
 	return true, nil
 }
 

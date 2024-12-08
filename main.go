@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -144,7 +145,7 @@ func genSends(ctx context.Context, send_interval uint32, jitter uint32, num_send
 func main() {
 	args := os.Args
 	if len(args) < 3 {
-		fmt.Printf("Format: main.go [edges csv file] [command]\nCommand can be either 'sim' or 'gen_sends'")
+		fmt.Printf("Format: main.go [edges csv file] [send interval] [jitter] [number of sends]\nCommand can be either 'sim' or 'gen_sends'")
 		return
 	}
 
@@ -152,6 +153,19 @@ func main() {
 	if err != nil {
 		fmt.Printf("%s\n", err.Error())
 		return
+	}
+
+	send_interval, err := strconv.ParseInt(args[2], 10, 64)
+	if err != nil {
+		panic("send interval not the correct format")
+	}
+	jitter, err := strconv.ParseInt(args[3], 10, 64)
+	if err != nil {
+		panic("jitter not the correct format")
+	}
+	number_of_sends, err := strconv.ParseInt(args[4], 10, 64)
+	if err != nil {
+		panic("'number of sends' not the correct format")
 	}
 
 	ctx := context.Background()
@@ -165,7 +179,7 @@ func main() {
 	}
 	main_event.Init()
 
-	sends, err := genSends(ctx, 5000, 2500, 10)
+	sends, err := genSends(ctx, uint32(send_interval), uint32(jitter), int(number_of_sends))
 	if err != nil {
 		fmt.Printf("%s\n", err.Error())
 		return
@@ -181,4 +195,17 @@ func main() {
 
 	for main_event.Step(ctx) == nil {
 	}
+
+	// Get all the max tx counts for each chain.
+	// This indicates congestion
+	max_congestion := 0
+	max_con_chain := ""
+	for _, chain := range main_event.BatonState.Chains {
+		fmt.Printf("Congestion: %s -- %d\n", chain.GetID(), chain.GetMaxTxCount())
+		if chain.GetMaxTxCount() > max_congestion {
+			max_con_chain = chain.GetID()
+			max_congestion = chain.GetMaxTxCount()
+		}
+	}
+	fmt.Printf("MOST congestion chain: %s -- %d\n", max_con_chain, max_congestion)
 }

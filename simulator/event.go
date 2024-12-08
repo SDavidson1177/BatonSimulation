@@ -173,6 +173,7 @@ func (e *HeightEvent) Execute(ctx context.Context) {
 	}
 
 	if chain, ok := state.Chains[e.chain]; ok {
+		chain.ResetTxCount()
 		fmt.Printf("Height of chain %s increased to %d at time %v\n", chain.GetID(), chain.IncHeight(), e.Time())
 	}
 }
@@ -301,6 +302,7 @@ func (e *DeliverEvent) Execute(ctx context.Context) {
 	}
 
 	if chain, ok := state.Chains[e.chain]; ok {
+		chain.IncreaseTxCount()
 		fmt.Printf("Delivering messages to chain %s at time %v\n", chain.GetID(), e.Time())
 	}
 }
