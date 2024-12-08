@@ -103,6 +103,12 @@ func genSends(ctx context.Context, send_interval uint32, jitter uint32, num_send
 		}
 	}
 
+	// Get direct and hubs from context
+	direct := ctx.Value(simulator.GetContextKey(simulator.DirectContextKey)).(bool)
+	hub_chains := ctx.Value(simulator.GetContextKey(simulator.HubsContextKey)).(map[string]bool)
+
+	fmt.Printf("Hub chains: %v\n", hub_chains)
+
 	// Generate the events
 	hops := make(map[string][]string)
 	retval := make([]*simulator.SendEvent, 0)
@@ -115,11 +121,19 @@ func genSends(ctx context.Context, send_interval uint32, jitter uint32, num_send
 		gs_evnt := next.(*simulator.GenSendEvent)
 		sp, ok := hops[fmt.Sprintf("%s-%s", gs_evnt.Src, gs_evnt.Dst)]
 		if !ok {
-			spi, err := simulator.GetShortestPath(ctx, gs_evnt.Src, gs_evnt.Dst)
+			spi, err := simulator.GetShortestPath(ctx, gs_evnt.Src, gs_evnt.Dst, hub_chains)
 			if err != nil {
-				return retval, errors.New("unreachable chain")
+				// Unreachable. Try another pair.
+				i--
+				continue
+			}
+
+			if !direct {
+				// We are using baton. Therefore, get the Baton shortest path
+				spi, _ = simulator.GetShortestPath(ctx, gs_evnt.Src, gs_evnt.Dst, make(map[string]bool))
 			}
 			sp = spi
+			hops[fmt.Sprintf("%s-%s", gs_evnt.Src, gs_evnt.Dst)] = sp
 		}
 
 		new_event := simulator.NewSendEvent(
@@ -145,7 +159,7 @@ func genSends(ctx context.Context, send_interval uint32, jitter uint32, num_send
 func main() {
 	args := os.Args
 	if len(args) < 3 {
-		fmt.Printf("Format: main.go [edges csv file] [send interval] [jitter] [number of sends]\nCommand can be either 'sim' or 'gen_sends'")
+		fmt.Printf("Format: main.go [edges csv file] [send interval] [jitter] [number of sends] [direct] [hubs...]\nCommand can be either 'sim' or 'gen_sends'")
 		return
 	}
 
@@ -173,6 +187,21 @@ func main() {
 	main_event := simulator.NewQueue()
 	ctx = context.WithValue(ctx, simulator.GetContextKey(simulator.StateContextKey), main_event.BatonState)
 
+	direct := false
+	if len(args) >= 6 && args[5] == "true" {
+		direct = true
+	}
+
+	ctx = context.WithValue(ctx, simulator.GetContextKey(simulator.DirectContextKey), direct)
+
+	hub_chains := make(map[string]bool)
+	if len(args) >= 7 {
+		for _, c := range args[6:] {
+			hub_chains[c] = true
+		}
+	}
+	ctx = context.WithValue(ctx, simulator.GetContextKey(simulator.HubsContextKey), hub_chains)
+
 	// Add blockchains
 	for _, chain := range chains {
 		main_event.BatonState.AddChain(chain)
@@ -187,7 +216,6 @@ func main() {
 
 	// Add events
 	for _, e := range sends {
-		fmt.Printf("%v\n", e)
 		simulator.AddEventToLoad(e)
 	}
 
@@ -201,7 +229,7 @@ func main() {
 	max_congestion := 0
 	max_con_chain := ""
 	for _, chain := range main_event.BatonState.Chains {
-		fmt.Printf("Congestion: %s -- %d\n", chain.GetID(), chain.GetMaxTxCount())
+		fmt.Printf("Congestion: %s -- %d| total %d\n", chain.GetID(), chain.GetMaxTxCount(), chain.TotalTx())
 		if chain.GetMaxTxCount() > max_congestion {
 			max_con_chain = chain.GetID()
 			max_congestion = chain.GetMaxTxCount()

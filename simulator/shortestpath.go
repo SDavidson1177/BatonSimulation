@@ -7,7 +7,24 @@ import (
 
 // GetShortestPath returns the shortest path from the source chain to the destination
 // chain. This uses hop count to determine the length of a path.
-func GetShortestPath(ctx context.Context, src string, dst string) ([]string, error) {
+// Hub: hub chains
+// Direct: If true, connect only directly or through hub chains
+func GetShortestPath(ctx context.Context, src string, dst string, hubs map[string]bool) ([]string, error) {
+	len_hubs := len(hubs)
+	is_hub := func(chain string) bool {
+		if len_hubs == 0 {
+			return true
+		}
+
+		for k := range hubs {
+			if chain == k {
+				return true
+			}
+		}
+
+		return false
+	}
+
 	// Get the state
 	state, err := GetStateFromContext(ctx)
 	if err != nil {
@@ -58,6 +75,17 @@ func GetShortestPath(ctx context.Context, src string, dst string) ([]string, err
 	node := event_queue.Pop().(*DijkstraEvent)
 	prev_chain[node.Chain] = ""
 	for node.Chain != dst {
+		// Check unreachability
+		if node.Distance == inf {
+			return nil, errors.New("unreachable")
+		}
+
+		// Check for hubs
+		if !(len_hubs == 0 || node.Distance == 1 || is_hub(node.Chain)) {
+			node = event_queue.Pop().(*DijkstraEvent)
+			continue
+		}
+
 		// Update all neighbours
 		for n := range state.Chains[node.Chain].neighbours {
 			c_event, c_index := event_queue.Find(&DijkstraEvent{Chain: n}, cmp)

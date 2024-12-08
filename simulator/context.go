@@ -1,5 +1,11 @@
 package simulator
 
+const (
+	StateContextKey  = "CTX_State"
+	HubsContextKey   = "CTX_Hubs"
+	DirectContextKey = "CTX_Direct"
+)
+
 type ContextKey struct {
 	Key string
 }

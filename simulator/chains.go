@@ -13,6 +13,7 @@ type Chain struct {
 	// Keep track of congestion
 	maxTxCount int
 	txCount    int
+	totalTx    int
 }
 
 func NewChain(id string) *Chain {
@@ -33,6 +34,7 @@ func (c *Chain) GetView(chain_id string) uint64 {
 
 func (c *Chain) IncreaseTxCount() {
 	c.txCount++
+	c.totalTx++
 }
 
 func (c *Chain) ResetTxCount() {
@@ -40,6 +42,10 @@ func (c *Chain) ResetTxCount() {
 		c.maxTxCount = c.txCount
 	}
 	c.txCount = 0
+}
+
+func (c *Chain) TotalTx() int {
+	return c.totalTx
 }
 
 func (c *Chain) GetMaxTxCount() int {

@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-const StateContextKey = "CTX_State"
-
 const (
 	IMPLICIT_HEIGHT          = 0
 	IMPLICIT_HEIGHT_INTERVAL = 4000 // 4 seconds
