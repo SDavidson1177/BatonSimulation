@@ -14,6 +14,12 @@ type EventHeap struct {
 	heap []Event
 }
 
+func NewEventHeap() *EventHeap {
+	return &EventHeap{
+		heap: make([]Event, 0),
+	}
+}
+
 func (eh *EventHeap) parent(i int) int {
 	if i >= len(eh.heap) {
 		return -1

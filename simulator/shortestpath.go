@@ -52,23 +52,33 @@ func GetShortestPath(ctx context.Context, src string, dst string) ([]string, err
 		return dijk_event.Chain == base_event.Chain
 	}
 
-	sp := make([]string, 1)
+	prev_chain := make(map[string]string)
+
+	sp := make([]string, 0)
 	node := event_queue.Pop().(*DijkstraEvent)
-	sp[0] = node.Chain
+	prev_chain[node.Chain] = ""
 	for node.Chain != dst {
 		// Update all neighbours
 		for n := range state.Chains[node.Chain].neighbours {
 			c_event, c_index := event_queue.Find(&DijkstraEvent{Chain: n}, cmp)
-			if c_event != nil {
+			if c_event != nil && c_event.(*DijkstraEvent).Distance > node.Distance+1 {
 				c_dijk_event := c_event.(*DijkstraEvent)
 				c_dijk_event.Distance = node.Distance + 1
 				event_queue.Update(c_index)
+				prev_chain[c_dijk_event.Chain] = node.Chain
 			}
 		}
 
 		// Get next
 		node = event_queue.Pop().(*DijkstraEvent)
-		sp = append(sp, node.Chain)
+	}
+
+	// create path
+	sp = append(sp, dst)
+	next_chain := prev_chain[dst]
+	for next_chain != "" {
+		sp = append([]string{next_chain}, sp...)
+		next_chain = prev_chain[next_chain]
 	}
 
 	return sp, nil

@@ -8,11 +8,11 @@ import (
 )
 
 const (
-	TEST_EVENT_TYPE    = 0
-	UPDATE_EVENT_TYPE  = 1
-	HEIGHT_EVENT_TYPE  = 2
-	SEND_EVENT_TYPE    = 3
-	DELIVER_EVENT_TYPE = 4
+	GEN_SEND_EVENT_TYPE = 0
+	UPDATE_EVENT_TYPE   = 1
+	HEIGHT_EVENT_TYPE   = 2
+	SEND_EVENT_TYPE     = 3
+	DELIVER_EVENT_TYPE  = 4
 )
 
 type Event interface {
@@ -27,51 +27,51 @@ type Event interface {
 	AdjustTime(time.Time)
 }
 
-// Test event
+// Generate sends event
 
-type TestEvent struct {
+type GenSendEvent struct {
 	event_time time.Time
-	following  []Event
+	Src        string
+	Dst        string
 }
 
-func NewTestEvent(t time.Time) *TestEvent {
-	return &TestEvent{event_time: t}
+func NewGenSendEvent(t time.Time, src, dst string) *GenSendEvent {
+	return &GenSendEvent{event_time: t, Src: src, Dst: dst}
 }
 
-func (t *TestEvent) Execute(ctx context.Context) {
-	fmt.Printf("test: %v\n", t.Time())
+func (e *GenSendEvent) Execute(ctx context.Context) {
+	fmt.Printf("test: %v\n", e.Time())
 }
 
-func (t *TestEvent) Type() uint64 {
-	return TEST_EVENT_TYPE
+func (e *GenSendEvent) Type() uint64 {
+	return GEN_SEND_EVENT_TYPE
 }
 
-func (t *TestEvent) Copy() Event {
-	return NewTestEvent(t.Time())
+func (e *GenSendEvent) Copy() Event {
+	return NewGenSendEvent(e.Time(), e.Src, e.Dst)
 }
 
-func (t *TestEvent) Time() time.Time {
-	return t.event_time
+func (e *GenSendEvent) Time() time.Time {
+	return e.event_time
 }
 
-func (t *TestEvent) AddMsg() {
-	fmt.Printf("Adding test event with time: %v\n", t.Time())
+func (e *GenSendEvent) AddMsg() {
+	fmt.Printf("Adding test event with time: %v\n", e.Time())
 }
 
-func (t *TestEvent) SubEvents() []Event {
+func (e *GenSendEvent) SubEvents() []Event {
 	return nil
 }
 
-func (t *TestEvent) SetFollowing(events []Event) {
-	t.following = events
+func (e *GenSendEvent) SetFollowing(events []Event) {
 }
 
-func (t *TestEvent) Following() []Event {
-	return t.following
+func (e *GenSendEvent) Following() []Event {
+	return nil
 }
 
-func (t *TestEvent) AdjustTime(et time.Time) {
-	t.event_time = et
+func (e *GenSendEvent) AdjustTime(et time.Time) {
+	e.event_time = et
 }
 
 // Update event
@@ -98,14 +98,15 @@ func (e *UpdateEvent) Execute(ctx context.Context) {
 		return
 	}
 
+	fmt.Printf("Executing chain %s : %v\n", ch.id, ch.view)
+
 	var updated bool
 	if updated, err = ch.UpdateView(e.neighbour); err != nil {
 		fmt.Printf("could not update view. %s\n", err.Error())
 	}
 
 	// Since update happened, neighbour should exist
-	n, _ := ch.GetNeighbour(e.neighbour)
-	fmt.Printf("Updated chain %s to view chain %s at height %d: %v\n", e.chain, e.neighbour, n.GetHeight(), e.Time())
+	fmt.Printf("Updated chain %s to view chain %s at height %d: %v\n", e.neighbour, e.chain, ch.GetHeight(), e.Time())
 
 	// Enqueue next update if there is one to follow
 	for _, follow := range e.Following() {
@@ -263,7 +264,7 @@ func (e *SendEvent) Time() time.Time {
 }
 
 func (e *SendEvent) AddMsg() {
-	fmt.Printf("Adding send event with time: %v\n", e.Time())
+	// fmt.Printf("Adding send event with time: %v\n", e.Time())
 }
 
 func (t *SendEvent) SubEvents() []Event {

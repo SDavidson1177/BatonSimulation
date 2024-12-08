@@ -34,10 +34,10 @@ func (c *Chain) UpdateView(chain_id string) (bool, error) {
 		return false, fmt.Errorf("cannot find chain %s for view update", chain_id)
 	}
 
-	if c.view[chain_id] == c.neighbours[chain_id].GetHeight() {
+	if c.GetHeight() == c.neighbours[chain_id].GetView(c.GetID()) {
 		return false, nil
 	}
-	c.view[chain_id] = c.neighbours[chain_id].GetHeight()
+	c.neighbours[chain_id].view[c.GetID()] = c.GetHeight()
 	return true, nil
 }
 
