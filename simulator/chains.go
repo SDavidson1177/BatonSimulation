@@ -64,9 +64,6 @@ func (c *Chain) UpdateView(chain_id string) (bool, error) {
 	}
 	c.neighbours[chain_id].view[c.GetID()] = c.GetHeight()
 
-	// Update the amount of transactions received at this block height
-	c.neighbours[chain_id].IncreaseTxCount()
-
 	return true, nil
 }
 

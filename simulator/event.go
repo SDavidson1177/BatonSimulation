@@ -8,11 +8,12 @@ import (
 )
 
 const (
-	GEN_SEND_EVENT_TYPE = 0
-	UPDATE_EVENT_TYPE   = 1
-	HEIGHT_EVENT_TYPE   = 2
-	SEND_EVENT_TYPE     = 3
-	DELIVER_EVENT_TYPE  = 4
+	GEN_SEND_EVENT_TYPE    = 0
+	UPDATE_EVENT_TYPE      = 1
+	HEIGHT_EVENT_TYPE      = 2
+	SEND_EVENT_TYPE        = 3
+	DELIVER_EVENT_TYPE     = 4
+	SEND_SINGLE_EVENT_TYPE = 5
 )
 
 type Event interface {
@@ -98,15 +99,22 @@ func (e *UpdateEvent) Execute(ctx context.Context) {
 		return
 	}
 
-	fmt.Printf("Executing chain %s : %v\n", ch.id, ch.view)
+	// fmt.Printf("Executing chain %s : %v\n", ch.id, ch.view)
 
 	var updated bool
 	if updated, err = ch.UpdateView(e.neighbour); err != nil {
 		fmt.Printf("could not update view. %s\n", err.Error())
+		return
 	}
 
 	// Since update happened, neighbour should exist
-	fmt.Printf("Updated chain %s to view chain %s at height %d: %v\n", e.neighbour, e.chain, ch.GetHeight(), e.Time())
+	// fmt.Printf("Updated chain %s to view chain %s at height %d: %v\n", e.neighbour, e.chain, ch.GetHeight(), e.Time())
+
+	// Update the amount of transactions received at this block height
+	if updated {
+		// fmt.Printf("Updated chain %s to view chain %s at height %d: %v\n", e.neighbour, e.chain, ch.GetHeight(), e.Time())
+		state.Chains[e.neighbour].IncreaseTxCount()
+	}
 
 	// Enqueue next update if there is one to follow
 	for _, follow := range e.Following() {
@@ -174,7 +182,9 @@ func (e *HeightEvent) Execute(ctx context.Context) {
 
 	if chain, ok := state.Chains[e.chain]; ok {
 		chain.ResetTxCount()
-		fmt.Printf("Height of chain %s increased to %d at time %v\n", chain.GetID(), chain.IncHeight(), e.Time())
+		val := chain.IncHeight()
+		_ = val
+		// fmt.Printf("Height of chain %s increased to %d at time %v\n", chain.GetID(), val, e.Time())
 	}
 }
 
@@ -303,7 +313,7 @@ func (e *DeliverEvent) Execute(ctx context.Context) {
 
 	if chain, ok := state.Chains[e.chain]; ok {
 		chain.IncreaseTxCount()
-		fmt.Printf("Delivering messages to chain %s at time %v\n", chain.GetID(), e.Time())
+		// fmt.Printf("Delivering messages to chain %s at time %v\n", chain.GetID(), e.Time())
 	}
 }
 
@@ -381,4 +391,78 @@ func (e *DijkstraEvent) SetFollowing(events []Event) {
 
 func (e *DijkstraEvent) AdjustTime(t time.Time) {
 	e.Distance = int(t.Unix())
+}
+
+// SendSingle event
+type SendSingleEvent struct {
+	event_time time.Time
+	following  []Event
+	src_chain  string
+	hops       []string // chain hops not including the source chain
+	iteration  int
+}
+
+func NewSendSingleEvent(t time.Time, src_chain string, hops []string) *SendSingleEvent {
+	return &SendSingleEvent{event_time: t, following: make([]Event, 0), src_chain: src_chain, hops: hops, iteration: 0}
+}
+
+func (e *SendSingleEvent) Execute(ctx context.Context) {
+	// Create update events
+	if len(e.hops) < 1 {
+		return
+	}
+
+	// This update and deliver event
+	d, _ := time.ParseDuration(fmt.Sprintf("%dms", int(math.Round(float64(e.iteration)*1.233*IMPLICIT_HEIGHT_INTERVAL))))
+	update_event := NewUpdateEvent(e.Time().Add(d), e.src_chain, e.hops[0])
+	deliver_event := NewDeliverEvent(e.Time().Add(d), e.hops[0])
+	update_event.SetFollowing([]Event{deliver_event})
+
+	// The next send event
+	if len(e.hops) > 1 {
+		next_send := e.Copy().(*SendSingleEvent)
+
+		next_send.iteration++
+		d, _ := time.ParseDuration(fmt.Sprintf("%dms", int(math.Round(float64(next_send.iteration)*1.233*IMPLICIT_HEIGHT_INTERVAL))))
+		next_send.AdjustTime(next_send.Time().Add(d))
+		next_send.src_chain = next_send.hops[0]
+		next_send.hops = next_send.hops[1:]
+		deliver_event.SetFollowing([]Event{deliver_event})
+	}
+
+	MainEventQueue.Enqueue(update_event)
+}
+
+func (e *SendSingleEvent) Type() uint64 {
+	return SEND_EVENT_TYPE
+}
+
+func (e *SendSingleEvent) Copy() Event {
+	copy := NewSendSingleEvent(e.Time(), e.src_chain, e.hops)
+	copy.iteration = e.iteration
+	return copy
+}
+
+func (e *SendSingleEvent) Time() time.Time {
+	return e.event_time
+}
+
+func (e *SendSingleEvent) AddMsg() {
+	// fmt.Printf("Adding send event with time: %v\n", e.Time())
+}
+
+func (t *SendSingleEvent) SubEvents() []Event {
+	return nil
+}
+
+func (e *SendSingleEvent) Following() []Event {
+	return e.following
+}
+
+func (e *SendSingleEvent) SetFollowing(events []Event) {
+	e.following = events
+}
+
+func (e *SendSingleEvent) AdjustTime(t time.Time) {
+	e.event_time = t
 }

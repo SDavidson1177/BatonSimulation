@@ -15,6 +15,8 @@ import (
 	"github.com/SDavidson1177/ThroughputSim/simulator"
 )
 
+// var disconnected map[string]bool
+
 // Reads in the blockchain topology from edges csv file.
 func readTopology(filename string) (map[string]*simulator.Chain, error) {
 	file, err := os.Open(filename)
@@ -124,6 +126,7 @@ func genSends(ctx context.Context, send_interval uint32, jitter uint32, num_send
 			spi, err := simulator.GetShortestPath(ctx, gs_evnt.Src, gs_evnt.Dst, hub_chains)
 			if err != nil {
 				// Unreachable. Try another pair.
+				// disconnected[fmt.Sprintf("%s-%s", gs_evnt.Src, gs_evnt.Dst)] = true
 				i--
 				continue
 			}
@@ -141,11 +144,11 @@ func genSends(ctx context.Context, send_interval uint32, jitter uint32, num_send
 			sp[0],
 			sp[1:],
 		)
-		fmt.Printf("Scheduling Send: %s --> %s | Time %v | Path %v\n",
-			gs_evnt.Src,
-			gs_evnt.Dst,
-			new_event.Time(),
-			sp)
+		// fmt.Printf("Scheduling Send: %s --> %s | Time %v | Path %v\n",
+		// 	gs_evnt.Src,
+		// 	gs_evnt.Dst,
+		// 	new_event.Time(),
+		// 	sp)
 		retval = append(retval, new_event)
 
 		base_time = gs_evnt.Time()
@@ -157,6 +160,8 @@ func genSends(ctx context.Context, send_interval uint32, jitter uint32, num_send
 }
 
 func main() {
+	// disconnected = make(map[string]bool)
+
 	args := os.Args
 	if len(args) < 3 {
 		fmt.Printf("Format: main.go [edges csv file] [send interval] [jitter] [number of sends] [direct] [hubs...]\nCommand can be either 'sim' or 'gen_sends'")
@@ -228,12 +233,20 @@ func main() {
 	// This indicates congestion
 	max_congestion := 0
 	max_con_chain := ""
+	all_tx := 0
 	for _, chain := range main_event.BatonState.Chains {
 		fmt.Printf("Congestion: %s -- %d| total %d\n", chain.GetID(), chain.GetMaxTxCount(), chain.TotalTx())
+		all_tx += chain.TotalTx()
 		if chain.GetMaxTxCount() > max_congestion {
 			max_con_chain = chain.GetID()
 			max_congestion = chain.GetMaxTxCount()
 		}
 	}
+
+	// for k := range disconnected {
+	// 	fmt.Printf("Disconnected: %s\n", k)
+	// }
+
 	fmt.Printf("MOST congestion chain: %s -- %d\n", max_con_chain, max_congestion)
+	fmt.Printf("Total Transactions: %d\n", all_tx)
 }

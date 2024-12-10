@@ -37,7 +37,7 @@ func NewState() *State {
 
 func (s *State) AddChain(ch *Chain) {
 	s.Chains[ch.GetID()] = ch
-	fmt.Printf("Add chain %s : %v\n", ch.id, ch.view)
+	// fmt.Printf("Add chain %s : %v\n", ch.id, ch.view)
 }
 
 // Initializes the implicit events. This must be called after all
