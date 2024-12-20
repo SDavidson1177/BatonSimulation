@@ -15,9 +15,15 @@ import (
 	"github.com/SDavidson1177/ThroughputSim/simulator"
 )
 
-// var disconnected map[string]bool
-
 // Reads in the blockchain topology from edges csv file.
+// The csv file should be structured as follows:
+//
+//	1,2
+//	2,3
+//	3,1
+//
+// Where the integers represent blockchain IDs, and the pairing
+// represents an IBC connection.
 func readTopology(filename string) (map[string]*simulator.Chain, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -55,8 +61,10 @@ func readTopology(filename string) (map[string]*simulator.Chain, error) {
 	return chains, nil
 }
 
-// Generates and prints a list of send events
-func genSends(ctx context.Context, send_interval uint32, jitter uint32, num_sends int) ([]*simulator.SendEvent, error) {
+// Generates a list of send events
+// If the channel type is 'multi', the event type will be  simulator.SendEvent
+// If the channel type is 'single', the event type will be simulator.SendSingleEvent
+func genSends(ctx context.Context, send_interval uint32, jitter uint32, num_sends int, is_multi_channel bool) ([]simulator.Event, error) {
 	if jitter >= send_interval {
 		return nil, errors.New("jitter cannot be >= than send interval")
 	}
@@ -113,7 +121,7 @@ func genSends(ctx context.Context, send_interval uint32, jitter uint32, num_send
 
 	// Generate the events
 	hops := make(map[string][]string)
-	retval := make([]*simulator.SendEvent, 0)
+	retval := make([]simulator.Event, 0)
 	for i := 0; i < num_sends; i++ {
 		next := queue.Pop()
 		if next == nil {
@@ -126,7 +134,6 @@ func genSends(ctx context.Context, send_interval uint32, jitter uint32, num_send
 			spi, err := simulator.GetShortestPath(ctx, gs_evnt.Src, gs_evnt.Dst, hub_chains)
 			if err != nil {
 				// Unreachable. Try another pair.
-				// disconnected[fmt.Sprintf("%s-%s", gs_evnt.Src, gs_evnt.Dst)] = true
 				i--
 				continue
 			}
@@ -139,16 +146,22 @@ func genSends(ctx context.Context, send_interval uint32, jitter uint32, num_send
 			hops[fmt.Sprintf("%s-%s", gs_evnt.Src, gs_evnt.Dst)] = sp
 		}
 
-		new_event := simulator.NewSendEvent(
-			gs_evnt.Time(),
-			sp[0],
-			sp[1:],
-		)
-		// fmt.Printf("Scheduling Send: %s --> %s | Time %v | Path %v\n",
-		// 	gs_evnt.Src,
-		// 	gs_evnt.Dst,
-		// 	new_event.Time(),
-		// 	sp)
+		var new_event simulator.Event
+
+		if is_multi_channel {
+			new_event = simulator.NewSendEvent(
+				gs_evnt.Time(),
+				sp[0],
+				sp[1:],
+			)
+		} else {
+			new_event = simulator.NewSendSingleEvent(
+				gs_evnt.Time(),
+				sp[0],
+				sp[1:],
+			)
+		}
+
 		retval = append(retval, new_event)
 
 		base_time = gs_evnt.Time()
@@ -160,11 +173,12 @@ func genSends(ctx context.Context, send_interval uint32, jitter uint32, num_send
 }
 
 func main() {
-	// disconnected = make(map[string]bool)
-
 	args := os.Args
-	if len(args) < 3 {
-		fmt.Printf("Format: main.go [edges csv file] [send interval] [jitter] [number of sends] [direct] [hubs...]\nCommand can be either 'sim' or 'gen_sends'")
+	if len(args) < 4 {
+		fmt.Printf(`Format: main.go [edges csv file] [channel_type] [send interval] [jitter] [number of sends] [direct] [hubs...]
+		Channel type can be either 'single' or 'multi'
+		'single' will assume single-hop channels, but 'multi' will allow for multi-hop channels
+`)
 		return
 	}
 
@@ -174,15 +188,20 @@ func main() {
 		return
 	}
 
-	send_interval, err := strconv.ParseInt(args[2], 10, 64)
+	channel_type := args[2]
+	if channel_type != "multi" && channel_type != "single" {
+		panic("channel type must be 'single' or 'multi'")
+	}
+
+	send_interval, err := strconv.ParseInt(args[3], 10, 64)
 	if err != nil {
 		panic("send interval not the correct format")
 	}
-	jitter, err := strconv.ParseInt(args[3], 10, 64)
+	jitter, err := strconv.ParseInt(args[4], 10, 64)
 	if err != nil {
 		panic("jitter not the correct format")
 	}
-	number_of_sends, err := strconv.ParseInt(args[4], 10, 64)
+	number_of_sends, err := strconv.ParseInt(args[5], 10, 64)
 	if err != nil {
 		panic("'number of sends' not the correct format")
 	}
@@ -193,7 +212,7 @@ func main() {
 	ctx = context.WithValue(ctx, simulator.GetContextKey(simulator.StateContextKey), main_event.BatonState)
 
 	direct := false
-	if len(args) >= 6 && args[5] == "true" {
+	if len(args) >= 6 && args[6] == "true" {
 		direct = true
 	}
 
@@ -201,7 +220,7 @@ func main() {
 
 	hub_chains := make(map[string]bool)
 	if len(args) >= 7 {
-		for _, c := range args[6:] {
+		for _, c := range args[7:] {
 			hub_chains[c] = true
 		}
 	}
@@ -213,7 +232,7 @@ func main() {
 	}
 	main_event.Init()
 
-	sends, err := genSends(ctx, uint32(send_interval), uint32(jitter), int(number_of_sends))
+	sends, err := genSends(ctx, uint32(send_interval), uint32(jitter), int(number_of_sends), channel_type == "multi")
 	if err != nil {
 		fmt.Printf("%s\n", err.Error())
 		return
@@ -242,10 +261,6 @@ func main() {
 			max_congestion = chain.GetMaxTxCount()
 		}
 	}
-
-	// for k := range disconnected {
-	// 	fmt.Printf("Disconnected: %s\n", k)
-	// }
 
 	fmt.Printf("MOST congestion chain: %s -- %d\n", max_con_chain, max_congestion)
 	fmt.Printf("Total Transactions: %d\n", all_tx)

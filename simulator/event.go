@@ -99,8 +99,6 @@ func (e *UpdateEvent) Execute(ctx context.Context) {
 		return
 	}
 
-	// fmt.Printf("Executing chain %s : %v\n", ch.id, ch.view)
-
 	var updated bool
 	if updated, err = ch.UpdateView(e.neighbour); err != nil {
 		fmt.Printf("could not update view. %s\n", err.Error())
@@ -112,8 +110,10 @@ func (e *UpdateEvent) Execute(ctx context.Context) {
 
 	// Update the amount of transactions received at this block height
 	if updated {
-		// fmt.Printf("Updated chain %s to view chain %s at height %d: %v\n", e.neighbour, e.chain, ch.GetHeight(), e.Time())
+		fmt.Printf("Updated chain %s to view chain %s at height %d: %v\n", e.neighbour, e.chain, ch.GetHeight(), e.Time())
 		state.Chains[e.neighbour].IncreaseTxCount()
+	} else {
+		fmt.Printf("Chain %s already views chain %s at height %d: %v\n", e.neighbour, e.chain, ch.GetHeight(), e.Time())
 	}
 
 	// Enqueue next update if there is one to follow
@@ -184,7 +184,7 @@ func (e *HeightEvent) Execute(ctx context.Context) {
 		chain.ResetTxCount()
 		val := chain.IncHeight()
 		_ = val
-		// fmt.Printf("Height of chain %s increased to %d at time %v\n", chain.GetID(), val, e.Time())
+		fmt.Printf("Height of chain %s increased to %d: %v\n", chain.GetID(), val, e.Time())
 	}
 }
 
@@ -255,6 +255,7 @@ func (e *SendEvent) Execute(ctx context.Context) {
 	// Add the deliver event
 	update_events[len(update_events)-1].SetFollowing([]Event{NewDeliverEvent(
 		update_events[len(update_events)-1].Time(),
+		e.src_chain,
 		e.hops[len(e.hops)-1],
 	)})
 
@@ -298,11 +299,12 @@ func (e *SendEvent) AdjustTime(t time.Time) {
 type DeliverEvent struct {
 	event_time time.Time
 	following  []Event
-	chain      string
+	src        string
+	dst        string
 }
 
-func NewDeliverEvent(t time.Time, chain_id string) *DeliverEvent {
-	return &DeliverEvent{event_time: t, following: make([]Event, 0), chain: chain_id}
+func NewDeliverEvent(t time.Time, src, dst string) *DeliverEvent {
+	return &DeliverEvent{event_time: t, following: make([]Event, 0), src: src, dst: dst}
 }
 
 func (e *DeliverEvent) Execute(ctx context.Context) {
@@ -311,9 +313,9 @@ func (e *DeliverEvent) Execute(ctx context.Context) {
 		return
 	}
 
-	if chain, ok := state.Chains[e.chain]; ok {
+	if chain, ok := state.Chains[e.dst]; ok {
 		chain.IncreaseTxCount()
-		// fmt.Printf("Delivering messages to chain %s at time %v\n", chain.GetID(), e.Time())
+		fmt.Printf("Delivering messages from chain %s to chain %s: %v\n", e.src, chain.GetID(), e.Time())
 	}
 }
 
@@ -322,7 +324,7 @@ func (e *DeliverEvent) Type() uint64 {
 }
 
 func (e *DeliverEvent) Copy() Event {
-	return NewDeliverEvent(e.Time(), e.chain)
+	return NewDeliverEvent(e.Time(), e.src, e.dst)
 }
 
 func (e *DeliverEvent) Time() time.Time {
@@ -415,7 +417,7 @@ func (e *SendSingleEvent) Execute(ctx context.Context) {
 	// This update and deliver event
 	d, _ := time.ParseDuration(fmt.Sprintf("%dms", int(math.Round(float64(e.iteration)*1.233*IMPLICIT_HEIGHT_INTERVAL))))
 	update_event := NewUpdateEvent(e.Time().Add(d), e.src_chain, e.hops[0])
-	deliver_event := NewDeliverEvent(e.Time().Add(d), e.hops[0])
+	deliver_event := NewDeliverEvent(e.Time().Add(d), e.src_chain, e.hops[0])
 	update_event.SetFollowing([]Event{deliver_event})
 
 	// The next send event
